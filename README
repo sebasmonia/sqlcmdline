@@ -1,0 +1,18 @@
+This utility has a storied story.
+While trying sql-Mode in Emacs, I changed the configuration to use sqlcmd instead of osql and I ran into a number of problems (the Emacs Wiki has a lot of details on this). I figured I could create my own tool to mimic the basic functionality of the real sqlcmd and make it play nice with comint and understand what was the issue.
+After a first attempt in .NET, I ended up back in Pythonland where everything is solved so much easier :) And since the test tool ended up working well enough, I added a few useful commands and here we are.
+
+This small source file can be compiled with PyInstaller. Uses f-strings, so it requires Python 3.6.
+
+TODO:
+
+-Add support for User/Pass logins, right now it assumed integrated security.
+-Command "parsing" (quotes because there isn't really parsing) is really fickle.
+-Ditto for command line arguments "parsing".
+-Since it uses ODBC, it should be really easy to connect to other databases. In that case the hardcoded command queries could be moved to a config file for each engine etc. Not interested in that right now, but it can be done.
+
+Currenly this works good enough and it fulfills its mission of making MSSQL and sql-mode play nice together.
+
+Contributors:
+Sebastián Monía - http://github.com/sebasmonia
+
