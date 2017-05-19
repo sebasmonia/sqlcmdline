@@ -6,7 +6,7 @@ This small source file can be compiled with PyInstaller. Uses f-strings, so it r
 
 TODO:
 
--Add support for User/Pass logins, right now it assumed integrated security.
+-Add support for User/Pass logins, right now it assumes integrated security.
 -Command "parsing" (quotes because there isn't really parsing) is really fickle.
 -Ditto for command line arguments "parsing".
 -Since it uses ODBC, it should be really easy to connect to other databases. In that case the hardcoded command queries could be moved to a config file for each engine etc. Not interested in that right now, but it can be done.
@@ -14,5 +14,5 @@ TODO:
 Currenly this works good enough and it fulfills its mission of making MSSQL and sql-mode play nice together.
 
 Contributors:
-Sebasti·n MonÌa - http://github.com/sebasmonia
+Sebasti√°n Mon√≠a - http://github.com/sebasmonia
 
