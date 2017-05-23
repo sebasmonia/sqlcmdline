@@ -2,7 +2,7 @@ import traceback
 import sys
 import pyodbc
 import math
-import operator
+import operator as op
 from collections import defaultdict, namedtuple
 from datetime import datetime
 
@@ -65,7 +65,7 @@ def command_tables(params):
 
 
 def command_columns(params):
-    try:
+x    try:
         cols = ("*" if "-full" in params else
                 "TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, "
                 "COLUMN_NAME, DATA_TYPE")
@@ -205,7 +205,7 @@ def format_rows(column_names, raw_rows):
     # IIRC now dicts are ordered but just in case/for other implementations
     formatted.insert(1, ["-"*width for index, width in
                          sorted(column_widths.items(),
-                                key=operator.itemgetter(0))])
+                                key=op.itemgetter(0))])
     return format_str, formatted
 
 
