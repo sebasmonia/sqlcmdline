@@ -1,3 +1,5 @@
+ # !/usr/bin/env python3
+
 import traceback
 import sys
 import pyodbc
@@ -5,7 +7,6 @@ import math
 import operator as op
 from collections import defaultdict, namedtuple
 from datetime import datetime
-
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
 max_column_width = 100
@@ -65,7 +66,7 @@ def command_tables(params):
 
 
 def command_columns(params):
-x    try:
+    try:
         cols = ("*" if "-full" in params else
                 "TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, "
                 "COLUMN_NAME, DATA_TYPE")
