@@ -1,5 +1,16 @@
- # !/usr/bin/env python3
+# !/usr/bin/env python3
+"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database> -E
 
+Small command line utility to query MSSQL databases. The parameters are named
+to match the official tool, "sqlcmd".
+
+Arguments:
+  -S <server>       Server name
+  -d <database>     Database to open
+  -E                Use Integrated Security. Required since there's no support
+                    for SQL Logins.
+"""
+from docopt import docopt
 import traceback
 import sys
 import pyodbc
@@ -234,24 +245,16 @@ def process_command(line_typed):
     return query, error, cb
 
 
-def parse_arguments(args):
-    # boneheaded algorithm
-    for index, argument in enumerate(args):
-        if argument == "-S":
-            server = args[index+1]
-        elif argument == "-d":
-            database = args[index+1]
-        # elif argument == "-E"
-    return server, database
-
-
-if __name__ == "__main__":
-    server, database = parse_arguments(sys.argv)
+def get_cursor(server, database):
     connection = (f"Driver={{SQL Server Native Client 11.0}};Server={server};"
                   f"Trusted_Connection=Yes;Database={database}")
     conn = pyodbc.connect(connection, autocommit=True)
     conn.timeout = 30  # 30 second timeout for queries. Should be configurable.
-    cursor = conn.cursor()
+    return conn.cursor()
+
+
+def query_loop(server, database):
+    cursor = get_cursor(server, database)
     print(f'Connected to server {server} database {database}')
     print()
     print('Special commands are prefixed with ":". For example, use ":exit" to'
@@ -285,3 +288,10 @@ if __name__ == "__main__":
             print("\n---ERROR---", flush=True)
         print()  # blank line
         query = input(prompt)
+
+
+if __name__ == "__main__":
+    arguments = docopt(__doc__)
+    server = arguments["-S"]
+    database = arguments["-d"]
+    query_loop(server, database)
