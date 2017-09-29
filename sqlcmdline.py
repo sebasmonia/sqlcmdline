@@ -12,7 +12,6 @@ Arguments:
 """
 from docopt import docopt
 import traceback
-import sys
 import pyodbc
 import math
 import operator as op
@@ -48,8 +47,11 @@ def command_help(params):
          f'"like proc_name"\n'
          f':funcs [func_name] [-full]{sep}List all functions, or procs '
          f'"like func_name"\n'
-         f':def [obj] will  call "sp_helptext obj". Results won\'t be '
-         f'truncated.\n')
+         f':def [obj] will call "sp_helptext obj". Results won\'t be '
+         f'truncated.\n'
+         f':file [path] opens the file and runs the script. No checking/'
+         f'parsing of the file will take place. The script is executed '
+         f'in a separate connection.\n')
     print(t)
     return (None, None, None)
 
@@ -151,6 +153,43 @@ def command_definition(params):
         return PreparedCommand(None, str(e), None)
 
 
+def command_file(params):
+    try:
+        # if the path had spaces it was space-split by
+        # the process_command function
+        path = " ".join(params)
+        if path.startswith('"') and path.endswith('"'):
+            # typical in "Copy as path" option from Explorer
+            path = path[1:-1]
+        command = []
+        # use of server and database from the __main__ block
+        # that means this command only works when invoked as script
+        # or if you manually set those values in the module. BAD!
+        file_cursor = get_cursor(server, database)
+        with open(path, 'r') as script:
+            for line in script:
+                if line.strip().upper().startswith('GO'):
+                    # TODO: add logic to support GO [count]
+                    file_cursor.execute(''.join(command))
+                    rcount = file_cursor.rowcount  # -1 for "select" queries
+                    if rcount == -1:
+                        try:
+                            print_rows(file_cursor)
+                        except pyodbc.ProgrammingError as pe:
+                            # I should really filter for the specific message
+                            # "No results.  Previous SQL was not a query."
+                            print("Block executed, no rows returned or "
+                                  "rowcount available")
+                    else:
+                        print("\nRows affected:", rcount, flush=True)
+                    command = []
+                else:
+                    command.append(line)
+        return PreparedCommand(None, None, None)
+    except Exception as e:
+        return PreparedCommand(None, str(e), None)
+
+
 commands = {":help": command_help,
             ":tables": command_tables,
             ":cols": command_columns,
@@ -158,7 +197,8 @@ commands = {":help": command_help,
             ":procs": command_procedures,
             ":funcs": command_functions,
             ":truncate": command_truncate,
-            ":def": command_definition}
+            ":def": command_definition,
+            ":file": command_file}
 
 
 def text_formatter(value):
@@ -257,15 +297,15 @@ def query_loop(server, database):
     cursor = get_cursor(server, database)
     print(f'Connected to server {server} database {database}')
     print()
-    print('Special commands are prefixed with ":". For example, use ":exit" to'
-          ' finish your session. Everything else is sent directly to the'
-          'server using ODBC.')
+    print('Special commands are prefixed with ":". For example, use ":exit" '
+          'or ":quit" to finish your session. Everything else is sent '
+          'directly to the server using ODBC.')
     print('Use ":help" to get a list of commands available')
     print()
     prompt = f"{server}@{database}>"
     query = input(prompt)
     callback = None
-    while query != ":exit":
+    while query not in (":exit", ":quit"):
         try:
             print()  # blank line
             if query.startswith(":"):
@@ -285,8 +325,8 @@ def query_loop(server, database):
         except Exception as e:
             print("---ERROR---\n")
             traceback.print_exc()
-            print("\n---ERROR---", flush=True)
-        print()  # blank line
+            print("\n---ERROR---")
+        print(flush=True)  # blank line
         query = input(prompt)
 
 
