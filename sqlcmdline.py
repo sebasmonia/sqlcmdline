@@ -5,8 +5,8 @@ Small command line utility to query MSSQL databases. The parameters are named
 to match the official tool, "sqlcmd".
 
 Arguments:
-  -S <server>       Server name
-  -d <database>     Database to open
+  -S <server>       Server name.
+  -d <database>     Database to open.
   -E                Use Integrated Security. Required since there's no support
                     for SQL Logins.
 """
@@ -18,13 +18,18 @@ import operator as op
 from collections import defaultdict, namedtuple
 from datetime import datetime
 
+# TODO: collect global variables (server, db, cursor, truncate state) in
+# a neat object that I can pass around for changes where needed.
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
 max_column_width = 100
 chars_to_cleanup = str.maketrans("\n\t\r", "   ")
+server = None
+database = None
+cursor = None
 
 
 def command_help(params):
-    t = ('--Available commands--'
+    t = ('--Available commands--\n'
          'Syntax: :command required_parameter [optional_parameter].'
          'Common command modifiers are:\n'
          '\t-eq: makes the next parameter an exact match, by default'
@@ -38,20 +43,22 @@ def command_help(params):
          f'maximum "chars" lenght. Default = 100. Setting to 0 shows full'
          f'contents.\n'
          f':tables [table_name]{sep}List all tables, or tables "like '
-         f'table name"\n'
+         f'table_name"\n'
          f':cols [-eq] table_name [-full]{sep}List columns for the table '
-         f'"like table name" (optionally, equal table_name).\n'
+         f'"like table_name" (optionally, equal table_name).\n'
          f':views [view_name] [-full]{sep}List all views, or views "like '
          f'view_name"\n'
          f':procs [proc_name] [-full]{sep}List all procedures, or procs '
          f'"like proc_name"\n'
          f':funcs [func_name] [-full]{sep}List all functions, or procs '
          f'"like func_name"\n'
-         f':def [obj] will call "sp_helptext obj". Results won\'t be '
+         f':def [obj]{sep}Will call "sp_helptext obj". Results won\'t be '
          f'truncated.\n'
-         f':file [path] opens the file and runs the script. No checking/'
-         f'parsing of the file will take place. The script is executed '
-         f'in a separate connection.\n')
+         f':file [path]{sep}Opens a file and runs the script. No checking/'
+         f'parsing of the file will take place.\n'
+         f':dbs [database_name]{sep}List all databases, or databases "like '
+         f'database_name".\n'
+         f':use [database]{sep}changes the connection to "database".\n')
     print(t)
     return (None, None, None)
 
@@ -154,6 +161,7 @@ def command_definition(params):
 
 
 def command_file(params):
+    global cursor
     try:
         # if the path had spaces it was space-split by
         # the process_command function
@@ -162,19 +170,15 @@ def command_file(params):
             # typical in "Copy as path" option from Explorer
             path = path[1:-1]
         command = []
-        # use of server and database from the __main__ block
-        # that means this command only works when invoked as script
-        # or if you manually set those values in the module. BAD!
-        file_cursor = get_cursor(server, database)
         with open(path, 'r') as script:
             for line in script:
                 if line.strip().upper().startswith('GO'):
                     # TODO: add logic to support GO [count]
-                    file_cursor.execute(''.join(command))
-                    rcount = file_cursor.rowcount  # -1 for "select" queries
+                    cursor.execute(''.join(command))
+                    rcount = cursor.rowcount  # -1 for "select" queries
                     if rcount == -1:
                         try:
-                            print_rows(file_cursor)
+                            print_rows(cursor)
                         except pyodbc.ProgrammingError as pe:
                             # I should really filter for the specific message
                             # "No results.  Previous SQL was not a query."
@@ -190,6 +194,26 @@ def command_file(params):
         return PreparedCommand(None, str(e), None)
 
 
+def command_databases(params):
+    q = f"SELECT name as 'Database Name' FROM master.dbo.sysdatabases "
+    if params:
+        if len(params) == 1:
+            q += f"WHERE name LIKE '%{params[0]}%'"
+        else:
+            return PreparedCommand(None, "Invalid arguments", None)
+    return PreparedCommand(q, None, None)
+
+
+def command_use(params):
+    global database
+    if params and len(params) == 1:
+        database = params[0]
+        connect_and_get_cursor()
+    else:
+        return PreparedCommand(None, "Invalid arguments", None)
+    return PreparedCommand(None, None, None)
+
+
 commands = {":help": command_help,
             ":tables": command_tables,
             ":cols": command_columns,
@@ -198,7 +222,9 @@ commands = {":help": command_help,
             ":funcs": command_functions,
             ":truncate": command_truncate,
             ":def": command_definition,
-            ":file": command_file}
+            ":file": command_file,
+            ":dbs": command_databases,
+            ":use": command_use}
 
 
 def text_formatter(value):
@@ -285,16 +311,21 @@ def process_command(line_typed):
     return query, error, cb
 
 
-def get_cursor(server, database):
+def connect_and_get_cursor():
+    global server
+    global database
+    global cursor
     connection = (f"Driver={{SQL Server Native Client 11.0}};Server={server};"
                   f"Trusted_Connection=Yes;Database={database}")
     conn = pyodbc.connect(connection, autocommit=True)
     conn.timeout = 30  # 30 second timeout for queries. Should be configurable.
-    return conn.cursor()
+    cursor = conn.cursor()
 
 
-def query_loop(server, database):
-    cursor = get_cursor(server, database)
+def query_loop():
+    global cursor
+    global server
+    global database
     print(f'Connected to server {server} database {database}')
     print()
     print('Special commands are prefixed with ":". For example, use ":exit" '
@@ -327,6 +358,7 @@ def query_loop(server, database):
             traceback.print_exc()
             print("\n---ERROR---")
         print(flush=True)  # blank line
+        prompt = f"{server}@{database}>"  # reevalue prompt in case db changed
         query = input(prompt)
 
 
@@ -334,4 +366,5 @@ if __name__ == "__main__":
     arguments = docopt(__doc__)
     server = arguments["-S"]
     database = arguments["-d"]
-    query_loop(server, database)
+    connect_and_get_cursor()
+    query_loop()
