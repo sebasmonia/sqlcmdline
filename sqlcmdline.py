@@ -1,5 +1,6 @@
 # !/usr/bin/env python3
-"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database> -E
+"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database>
+                                      (-E | -U <user> -P <password>)
 
 Small command line utility to query MSSQL databases. The parameters are named
 to match the official tool, "sqlcmd".
@@ -7,8 +8,9 @@ to match the official tool, "sqlcmd".
 Arguments:
   -S <server>       Server name.
   -d <database>     Database to open.
-  -E                Use Integrated Security. Required since there's no support
-                    for SQL Logins.
+  -E                Use Integrated Security.
+  -U                SQL Login user
+  -P                SQL Login password
 """
 from docopt import docopt
 import traceback
@@ -17,15 +19,16 @@ import math
 import operator as op
 from collections import defaultdict, namedtuple
 from datetime import datetime
+import decimal  # added for PyInstaller
 
-# TODO: collect global variables (server, db, cursor, truncate state) in
-# a neat object that I can pass around for changes where needed.
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
 max_column_width = 100
+max_rows_print = 100
 chars_to_cleanup = str.maketrans("\n\t\r", "   ")
-server = None
-database = None
+
+ConnParams = namedtuple("ConnParams", "server database user password")
 cursor = None
+conninfo = None
 
 
 def command_help(params):
@@ -42,6 +45,8 @@ def command_help(params):
          f':truncate [chars]{sep}truncates the results to columns of'
          f'maximum "chars" lenght. Default = 100. Setting to 0 shows full'
          f'contents.\n'
+         f':rows [rownum]{sep}prints only "rownum" out of the whole resultset.'
+         f' Default = 100. Setting to 0 prints all the rows.'
          f':tables [table_name]{sep}List all tables, or tables "like '
          f'table_name"\n'
          f':cols [-eq] table_name [-full]{sep}List columns for the table '
@@ -70,6 +75,17 @@ def command_truncate(params):
         # I guess this could be improved...
         max_column_width = col_size if col_size != 0 else 1000000000
         print("Truncate value set")
+        return PreparedCommand(None, None, None)
+    except Exception as e:
+        return PreparedCommand(None, "Invalid arguments", None)
+
+
+def command_rows(params):
+    try:
+        global max_rows_print
+        max_rows_print = int(params[0])
+        msg = "ALL" if not max_rows_print else max_rows_print
+        print(f"Print set to {msg} rows of each resultset")
         return PreparedCommand(None, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments", None)
@@ -221,6 +237,7 @@ commands = {":help": command_help,
             ":procs": command_procedures,
             ":funcs": command_functions,
             ":truncate": command_truncate,
+            ":rows": command_rows,
             ":def": command_definition,
             ":file": command_file,
             ":dbs": command_databases,
@@ -236,13 +253,25 @@ def text_formatter(value):
 
 
 def print_rows(cursor):
-    odbc_rows = cursor.fetchall()
+    global max_rows_print
+    if max_rows_print:
+        odbc_rows = cursor.fetchmany(max_rows_print)
+    else:
+        odbc_rows = cursor.fetchall()
     column_names = [text_formatter(column[0]) for column in cursor.description]
     format_str, print_ready = format_rows(column_names, odbc_rows)
     print()  # blank line
     for row in print_ready:
         print(format_str.format(*row))
-    print("\nRows returned:", len(odbc_rows), "\n")
+    # Turns out cursor.rowcount is not reliable. Ideally I woud like to
+    # display the number of rows affected and how many printed. Since I can't
+    # I'll settle for this alternative:
+    printed_rows = len(odbc_rows)
+    if printed_rows < max_rows_print or max_rows_print == 0:
+        print(f"\nRows returned: {printed_rows}\n")
+    else:
+        rowcount = "(unknown)" if cursor.rowcount == -1 else cursor.rowcount
+        print(f"\nRows printed: {max_rows_print}. Total rows: {rowcount}\n")
 
 
 def format_rows(column_names, raw_rows):
@@ -312,11 +341,16 @@ def process_command(line_typed):
 
 
 def connect_and_get_cursor():
-    global server
-    global database
     global cursor
-    connection = (f"Driver={{SQL Server Native Client 11.0}};Server={server};"
-                  f"Trusted_Connection=Yes;Database={database}")
+    global conninfo
+    connection = (f"Driver={{SQL Server Native Client 11.0}};"
+                  f"Server={conninfo.server};"
+                  f"Database={conninfo.database};")
+    if not conninfo.user:
+        connection += "Trusted_Connection=Yes;"
+    else:
+        connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
+
     conn = pyodbc.connect(connection, autocommit=True)
     conn.timeout = 30  # 30 second timeout for queries. Should be configurable.
     cursor = conn.cursor()
@@ -366,5 +400,8 @@ if __name__ == "__main__":
     arguments = docopt(__doc__)
     server = arguments["-S"]
     database = arguments["-d"]
+    user = arguments["<user>"]
+    password = arguments["<password>"]
+    conninfo = ConnParams(server, database, user, password)
     connect_and_get_cursor()
     query_loop()
