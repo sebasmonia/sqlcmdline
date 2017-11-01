@@ -16,6 +16,7 @@ from docopt import docopt
 import traceback
 import pyodbc
 import math
+import struct
 import operator as op
 from collections import defaultdict, namedtuple
 from datetime import datetime
@@ -339,6 +340,13 @@ def process_command(line_typed):
         print(f"Query: {query}")
     return query, error, cb
 
+# from https://github.com/mkleehammer/pyodbc/wiki/Using-an-Output-Converter-function
+def handle_datetimeoffset(dto_value):
+    # ref: https://github.com/mkleehammer/pyodbc/issues/134#issuecomment-281739794
+    tup = struct.unpack("<6hI2h", dto_value)  # e.g., (2017, 3, 16, 10, 35, 18, 0, -6, 0)
+    tweaked = [tup[i] // 100 if i == 6 else tup[i] for i in range(len(tup))]
+    return "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:07d} {:+03d}:{:02d}".format(*tweaked)
+
 
 def connect_and_get_cursor():
     global cursor
@@ -352,6 +360,7 @@ def connect_and_get_cursor():
         connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
 
     conn = pyodbc.connect(connection, autocommit=True)
+    conn.add_output_converter(-155, handle_datetimeoffset)
     conn.timeout = 30  # 30 second timeout for queries. Should be configurable.
     cursor = conn.cursor()
 
