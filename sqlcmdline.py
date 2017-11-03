@@ -23,22 +23,23 @@ from datetime import datetime
 import decimal  # added for PyInstaller
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
+ConnParams = namedtuple("ConnParams", "server database user password")
+
 max_column_width = 100
 max_rows_print = 100
 chars_to_cleanup = str.maketrans("\n\t\r", "   ")
 
-ConnParams = namedtuple("ConnParams", "server database user password")
 cursor = None
 conninfo = None
 
 
 def command_help(params):
     t = ('--Available commands--\n'
-         'Syntax: :command required_parameter [optional_parameter].'
+         'Syntax: :command required_parameter [optional_parameter].\n\n'
          'Common command modifiers are:\n'
          '\t-eq: makes the next parameter an exact match, by default'
-         'all parameters use LIKE comparisons\n'
-         '\t-full: for certain commands, will return * from '
+         ' all parameters use LIKE comparisons\n'
+         '\t-full: in some commands, will return * from '
          'INFORMATION_SCHEMA instead of a smaller subset of columns\n')
     print(t)
     sep = " -- "
@@ -195,7 +196,7 @@ def command_file(params):
                     rcount = cursor.rowcount  # -1 for "select" queries
                     if rcount == -1:
                         try:
-                            print_rows(cursor)
+                            print_results(cursor)
                         except pyodbc.ProgrammingError as pe:
                             # I should really filter for the specific message
                             # "No results.  Previous SQL was not a query."
@@ -253,7 +254,13 @@ def text_formatter(value):
     return value
 
 
-def print_rows(cursor):
+def print_results(cursor):
+    print_resultset(cursor)
+    while cursor.nextset():
+        print_resultset(cursor)
+
+
+def print_resultset(cursor):
     global max_rows_print
     if max_rows_print:
         odbc_rows = cursor.fetchmany(max_rows_print)
@@ -358,11 +365,21 @@ def connect_and_get_cursor():
         connection += "Trusted_Connection=Yes;"
     else:
         connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
-
     conn = pyodbc.connect(connection, autocommit=True)
     conn.add_output_converter(-155, handle_datetimeoffset)
     conn.timeout = 30  # 30 second timeout for queries. Should be configurable.
     cursor = conn.cursor()
+
+
+def prompt_query_command():
+    lines = []
+    while True:
+        lines.append(input(">"))
+        last = lines[-1]
+        if last.strip().upper().startswith('GO'):
+            return '\n'.join(lines[:-1])  # Exclude GO
+        if last.startswith(":"):
+            return lines[-1]  # for commands ignore previous lines
 
 
 def query_loop():
@@ -375,9 +392,8 @@ def query_loop():
           'or ":quit" to finish your session. Everything else is sent '
           'directly to the server using ODBC.')
     print('Use ":help" to get a list of commands available')
-    print()
-    prompt = f"{server}@{database}>"
-    query = input(prompt)
+    print(f"{server}@{database}")
+    query = prompt_query_command()
     callback = None
     while query not in (":exit", ":quit"):
         try:
@@ -387,10 +403,11 @@ def query_loop():
                 if cmd_error:
                     print(f"Command error: {cmd_error}")
             if query:
+                # print("\n----------\n", query, "\n----------\n")
                 cursor.execute(query)
                 rcount = cursor.rowcount  # -1 for "select" queries
                 if rcount == -1:
-                    print_rows(cursor)
+                    print_results(cursor)
                 else:
                     print("\nRows affected:", rcount, flush=True)
                 if callback:
@@ -401,8 +418,8 @@ def query_loop():
             traceback.print_exc()
             print("\n---ERROR---")
         print(flush=True)  # blank line
-        prompt = f"{server}@{database}>"  # reevalue prompt in case db changed
-        query = input(prompt)
+        print(f"{server}@{database}")
+        query = prompt_query_command()
 
 
 if __name__ == "__main__":
