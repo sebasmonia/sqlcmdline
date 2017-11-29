@@ -44,11 +44,11 @@ def command_help(params):
     print(t)
     sep = " -- "
     t = (f':help{sep}prints the command list\n'
-         f':truncate [chars]{sep}truncates the results to columns of'
-         f'maximum "chars" lenght. Default = 100. Setting to 0 shows full'
+         f':truncate [chars]{sep}truncates the results to columns of '
+         f'maximum "chars" length. Default = 100. Setting to 0 shows full '
          f'contents.\n'
          f':rows [rownum]{sep}prints only "rownum" out of the whole resultset.'
-         f' Default = 100. Setting to 0 prints all the rows.'
+         f' Default = 100. Setting to 0 prints all the rows.\n'
          f':tables [table_name]{sep}List all tables, or tables "like '
          f'table_name"\n'
          f':cols [-eq] table_name [-full]{sep}List columns for the table '
@@ -73,10 +73,14 @@ def command_help(params):
 def command_truncate(params):
     try:
         global max_column_width
-        col_size = int(params[0])
-        # I guess this could be improved...
-        max_column_width = col_size if col_size != 0 else 1000000000
-        print("Truncate value set")
+        if not params:
+            print(f'Current ":truncate" value: {max_column_width}')
+        else:
+            col_size = int(params[0])
+            if col_size < 0:
+                raise
+            max_column_width = col_size
+            print("Truncate value set")
         return PreparedCommand(None, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments", None)
@@ -85,9 +89,15 @@ def command_truncate(params):
 def command_rows(params):
     try:
         global max_rows_print
-        max_rows_print = int(params[0])
-        msg = "ALL" if not max_rows_print else max_rows_print
-        print(f"Print set to {msg} rows of each resultset")
+        if not params:
+            print(f'Current ":rows" value: {max_rows_print}')
+        else:
+            max_rows = int(params[0])
+            if max_rows < 0:
+                raise
+            max_rows_print = max_rows
+            msg = "ALL" if not max_rows_print else max_rows_print
+            print(f"Printing set to {msg} rows of each resultset")
         return PreparedCommand(None, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments", None)
@@ -165,14 +175,19 @@ def command_functions(params):
 def command_definition(params):
     try:
         global max_column_width
-        current_value = max_column_width
+        global max_rows_print
+        current_trunc = max_column_width
+        current_rows = max_rows_print
 
         def revert_truncate():
             global max_column_width
-            max_column_width = current_value
+            global max_rows_print
+            max_column_width = current_trunc
+            max_rows_print = current_rows
 
         max_column_width = 1000000000
-        q = f"sp_helptext {params[0]}"
+        max_rows_print = 0
+        q = f"sp_helptext '{params[0]}'"
         return PreparedCommand(q, None, revert_truncate)
     except Exception as e:
         return PreparedCommand(None, str(e), None)
@@ -223,13 +238,20 @@ def command_databases(params):
 
 
 def command_use(params):
-    global database
+    global conninfo
+    message = None
     if params and len(params) == 1:
-        database = params[0]
-        connect_and_get_cursor()
+        old_conn = conninfo
+        conninfo = ConnParams(conninfo.server, params[0], conninfo.user,
+                              conninfo.password)
+        try:
+            connect_and_get_cursor()
+        except:
+            conninfo = old_conn
+            message = f"Connection to database {params[0]} failed."
     else:
-        return PreparedCommand(None, "Invalid arguments", None)
-    return PreparedCommand(None, None, None)
+        message = "Invalid arguments"
+    return PreparedCommand(None, message, None)
 
 
 commands = {":help": command_help,
@@ -249,7 +271,7 @@ commands = {":help": command_help,
 def text_formatter(value):
     value = str(value)
     value = str.translate(value, chars_to_cleanup)
-    if len(value) > max_column_width:
+    if max_column_width and len(value) > max_column_width:
         value = value[:max_column_width-5] + "[...]"
     return value
 
@@ -384,15 +406,15 @@ def prompt_query_command():
 
 def query_loop():
     global cursor
-    global server
-    global database
-    print(f'Connected to server {server} database {database}')
+    global conninfo
+    print(f'Connected to server {conninfo.server} '
+          f'database {conninfo.database}')
     print()
     print('Special commands are prefixed with ":". For example, use ":exit" '
           'or ":quit" to finish your session. Everything else is sent '
           'directly to the server using ODBC.')
     print('Use ":help" to get a list of commands available')
-    print(f"{server}@{database}")
+    print(f"{conninfo.server}@{conninfo.database}")
     query = prompt_query_command()
     callback = None
     while query not in (":exit", ":quit"):
@@ -418,7 +440,7 @@ def query_loop():
             traceback.print_exc()
             print("\n---ERROR---")
         print(flush=True)  # blank line
-        print(f"{server}@{database}")
+        print(f"{conninfo.server}@{conninfo.database}")
         query = prompt_query_command()
 
 
