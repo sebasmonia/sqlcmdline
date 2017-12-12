@@ -57,15 +57,17 @@ def command_help(params):
          f'view_name"\n'
          f':procs [proc_name] [-full]{sep}List all procedures, or procs '
          f'"like proc_name"\n'
-         f':funcs [func_name] [-full]{sep}List all functions, or procs '
+         f':funcs [func_name] [-full]{sep}List all functions, or functions '
          f'"like func_name"\n'
-         f':def [obj]{sep}Will call "sp_helptext obj". Results won\'t be '
-         f'truncated.\n'
-         f':file [path]{sep}Opens a file and runs the script. No checking/'
+         f':src obj.name{sep}Will call "sp_helptext obj.name". Results won\'t'
+         f' be truncated.\n'
+         f':deps [to|from] obj.name{sep}Show dependencies to/from obj.name.'
+         f':file path{sep}Opens a file and runs the script. No checking/'
          f'parsing of the file will take place.\n'
-         f':dbs [database_name]{sep}List all databases, or databases "like '
+         f':dbs database_name{sep}List all databases, or databases "like '
          f'database_name".\n'
-         f':use [database]{sep}changes the connection to "database".\n')
+         f':use database_name{sep}changes the connection to "database_name".'
+         f'\n')
     print(t)
     return (None, None, None)
 
@@ -172,7 +174,7 @@ def command_functions(params):
         return PreparedCommand(None, "Invalid arguments", None)
 
 
-def command_definition(params):
+def command_source(params):
     try:
         global max_column_width
         global max_rows_print
@@ -185,9 +187,36 @@ def command_definition(params):
             max_column_width = current_trunc
             max_rows_print = current_rows
 
-        max_column_width = 1000000000
+        max_column_width = 0
         max_rows_print = 0
         q = f"sp_helptext '{params[0]}'"
+        return PreparedCommand(q, None, revert_truncate)
+    except Exception as e:
+        return PreparedCommand(None, str(e), None)
+
+
+def command_dependencies(params):
+    try:
+        global max_column_width
+        global max_rows_print
+        current_trunc = max_column_width
+        current_rows = max_rows_print
+
+        def revert_truncate():
+            global max_column_width
+            global max_rows_print
+            max_column_width = current_trunc
+            max_rows_print = current_rows
+
+        max_column_width = 0
+        max_rows_print = 0
+        if params[0] == 'from':
+            # Depend on
+            q = "EXEC sp_MSdependencies N'{name}', NULL, 1053183"
+        elif params[0] == 'on':
+            # Need me
+            q = "EXEC sp_MSdependencies N'{name}', NULL, 1315327"
+        q = q.format(name=params[1])
         return PreparedCommand(q, None, revert_truncate)
     except Exception as e:
         return PreparedCommand(None, str(e), None)
@@ -262,7 +291,8 @@ commands = {":help": command_help,
             ":funcs": command_functions,
             ":truncate": command_truncate,
             ":rows": command_rows,
-            ":def": command_definition,
+            ":src": command_source,
+            ":deps": command_dependencies,
             ":file": command_file,
             ":dbs": command_databases,
             ":use": command_use}
@@ -368,6 +398,7 @@ def process_command(line_typed):
     if not error and query:
         print(f"Query: {query}")
     return query, error, cb
+
 
 # from https://github.com/mkleehammer/pyodbc/wiki/Using-an-Output-Converter-function
 def handle_datetimeoffset(dto_value):
