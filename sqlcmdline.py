@@ -61,7 +61,7 @@ def command_help(params):
          f'"like func_name"\n'
          f':src obj.name{sep}Will call "sp_helptext obj.name". Results won\'t'
          f' be truncated.\n'
-         f':deps [to|from] obj.name{sep}Show dependencies to/from obj.name.'
+         f':deps [to|from] obj.name{sep}Show dependencies to/from obj.name.\n'
          f':file path{sep}Opens a file and runs the script. No checking/'
          f'parsing of the file will take place.\n'
          f':dbs database_name{sep}List all databases, or databases "like '
@@ -216,6 +216,8 @@ def command_dependencies(params):
         elif params[0] == 'on':
             # Need me
             q = "EXEC sp_MSdependencies N'{name}', NULL, 1315327"
+        else:
+            return PreparedCommand(None, 'Invalid arguments', None)
         q = q.format(name=params[1])
         return PreparedCommand(q, None, revert_truncate)
     except Exception as e:
@@ -351,13 +353,12 @@ def format_rows(column_names, raw_rows):
             elif isinstance(value, datetime):
                 new_len = 26
                 new_value = value.isoformat()
-            elif isinstance(value, int):
-                new_len = number_len(value)
+            elif isinstance(value, (int, float, decimal.Decimal)):
+                new_len = decimal_len(decimal.Decimal(value))
                 new_value = value
             elif isinstance(value, str):
                 new_value = text_formatter(value)
                 new_len = len(new_value)
-
             if new_len > column_widths[index]:
                 column_widths[index] = new_len
             new_row.append(new_value)
@@ -376,16 +377,9 @@ def format_rows(column_names, raw_rows):
     return format_str, formatted
 
 
-def number_len(number):
-    # Source:
-    # http://stackoverflow.com/questions/2189800/length-of-an-integer-in-python
-    if number > 0:
-        digits = int(math.log10(number))+1
-    elif number == 0:
-        digits = 1
-    else:
-        digits = int(math.log10(-number))+2  # +1 if you don't count the '-'
-    return digits
+def decimal_len(decimal_number):
+    sign, digits, _ = decimal_number.as_tuple()
+    return len(digits) + sign
 
 
 def process_command(line_typed):
@@ -429,7 +423,7 @@ def prompt_query_command():
     while True:
         lines.append(input(">"))
         last = lines[-1]
-        if last.strip().upper().startswith('GO'):
+        if last.strip().upper().startswith('GO') or last == ";":
             return '\n'.join(lines[:-1])  # Exclude GO
         if last.startswith(":"):
             return lines[-1]  # for commands ignore previous lines
