@@ -26,7 +26,7 @@ PreparedCommand = namedtuple("PrepCmd", "query error callback")
 ConnParams = namedtuple("ConnParams", "server database user password")
 
 max_column_width = 100
-max_rows_print = 100
+max_rows_print = 50
 chars_to_cleanup = str.maketrans("\n\t\r", "   ")
 
 cursor = None
@@ -353,7 +353,10 @@ def format_rows(column_names, raw_rows):
             elif isinstance(value, datetime):
                 new_len = 26
                 new_value = value.isoformat()
-            elif isinstance(value, (int, float, decimal.Decimal)):
+            elif isinstance(value, int):
+                new_len = int_len(value)
+                new_value = value
+            elif isinstance(value, (float, decimal.Decimal)):
                 new_len = decimal_len(decimal.Decimal(value))
                 new_value = value
             elif isinstance(value, str):
@@ -377,9 +380,22 @@ def format_rows(column_names, raw_rows):
     return format_str, formatted
 
 
+def int_len(number):
+    # Source:
+    # http://stackoverflow.com/questions/2189800/length-of-an-integer-in-python
+    if number > 0:
+        digits = int(math.log10(number))+1
+    elif number == 0:
+        digits = 1
+    else:
+        digits = int(math.log10(-number))+2  # +1 if you don't count the '-'
+    return digits
+
+
 def decimal_len(decimal_number):
     sign, digits, _ = decimal_number.as_tuple()
-    return len(digits) + sign
+    # digits + separator + sign (where sign is either 0 or 1 for negatives
+    return len(digits + 1) + sign
 
 
 def process_command(line_typed):
@@ -424,7 +440,7 @@ def prompt_query_command():
         lines.append(input(">"))
         last = lines[-1]
         if last.strip().upper().startswith('GO') or last == ";":
-            return '\n'.join(lines[:-1])  # Exclude GO
+            return '\n'.join(lines[:-1])  # Exclude GO or ;
         if last.startswith(":"):
             return lines[-1]  # for commands ignore previous lines
 
