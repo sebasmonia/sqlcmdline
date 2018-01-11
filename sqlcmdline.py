@@ -9,8 +9,8 @@ Arguments:
   -S <server>       Server name.
   -d <database>     Database to open.
   -E                Use Integrated Security.
-  -U                SQL Login user
-  -P                SQL Login password
+  -U <user>         SQL Login user
+  -P <password>     SQL Login password
 """
 from docopt import docopt
 import traceback
@@ -439,7 +439,7 @@ def prompt_query_command():
     while True:
         lines.append(input(">"))
         last = lines[-1]
-        if last.strip().upper().startswith('GO') or last == ";":
+        if last.strip().upper().startswith('GO'):
             return '\n'.join(lines[:-1])  # Exclude GO or ;
         if last.startswith(":"):
             return lines[-1]  # for commands ignore previous lines
@@ -489,8 +489,8 @@ if __name__ == "__main__":
     arguments = docopt(__doc__)
     server = arguments["-S"]
     database = arguments["-d"]
-    user = arguments["<user>"]
-    password = arguments["<password>"]
+    user = arguments["-U"]
+    password = arguments["-P"]
     conninfo = ConnParams(server, database, user, password)
     connect_and_get_cursor()
     query_loop()
