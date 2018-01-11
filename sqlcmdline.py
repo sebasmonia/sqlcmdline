@@ -395,7 +395,7 @@ def int_len(number):
 def decimal_len(decimal_number):
     sign, digits, _ = decimal_number.as_tuple()
     # digits + separator + sign (where sign is either 0 or 1 for negatives
-    return len(digits + 1) + sign
+    return len(digits) + 1 + sign
 
 
 def process_command(line_typed):
