@@ -323,8 +323,9 @@ def print_resultset(cursor):
     column_names = [text_formatter(column[0]) for column in cursor.description]
     format_str, print_ready = format_rows(column_names, odbc_rows)
     print()  # blank line
-    for row in print_ready:
-        print(format_str.format(*row))
+    # Issue #3, printing too slow. Trade off memory for speed when printing
+    # a resultset
+    print("\n".join(format_str.format(*row) for row in print_ready))
     # Turns out cursor.rowcount is not reliable. Ideally I woud like to
     # display the number of rows affected and how many printed. Since I can't
     # I'll settle for this alternative:
@@ -394,7 +395,7 @@ def int_len(number):
 
 def decimal_len(decimal_number):
     sign, digits, _ = decimal_number.as_tuple()
-    # digits + separator + sign (where sign is either 0 or 1 for negatives
+    # digits + separator + sign (where sign is either 0 or 1 for negatives)
     return len(digits) + 1 + sign
 
 
