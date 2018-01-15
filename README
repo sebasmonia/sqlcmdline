@@ -1,5 +1,5 @@
 Drop in replacement for sqlcmd that works better with Sql-Mode in Emacs.
-This implements only a subset of the options in sqlcmd, but more than enough for SQLi buffers.
+It only implements a subset of the options in sqlcmd, but more than enough for SQLi buffers.
 
 The source file can be compiled with PyInstaller. Uses f-strings, so it requires Python 3.6.
 
@@ -12,4 +12,4 @@ Currently this works good enough and it fulfills its mission of making MSSQL and
 
 Contributors:
 Sebastián Monía - http://github.com/sebasmonia
-
+Hodge - https://github.com/sukeyisme
