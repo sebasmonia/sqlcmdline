@@ -16,6 +16,8 @@ from docopt import docopt
 import traceback
 import pyodbc
 import math
+import os
+import sys
 import struct
 import operator as op
 from collections import defaultdict, namedtuple
@@ -299,6 +301,8 @@ commands = {":help": command_help,
             ":dbs": command_databases,
             ":use": command_use}
 
+custom_commands = {}
+
 
 def text_formatter(value):
     value = str(value)
@@ -400,23 +404,57 @@ def decimal_len(decimal_number):
 
 
 def process_command(line_typed):
-    command_name, *params = line_typed.split(" ")
-    if command_name not in commands:
+    try:
+        command_name, *params = line_typed.split(" ")
+    except:
+        command_name = "Nope"
+    if command_name in commands:
+        command_handler = commands[command_name]
+        query, error, cb = command_handler(params)
+    elif command_name in custom_commands:
+        template = custom_commands[command_name]
+        query = template.format(*params)
+        error = None
+        cb = None
+    else:
         t = "Invalid command name. Use :help for a list of available commands."
-        return None, t
-    command_handler = commands[command_name]
-    query, error, cb = command_handler(params)
+        return None, t, None
     if not error and query:
         print(f"Query: {query}")
     return query, error, cb
 
 
-# from https://github.com/mkleehammer/pyodbc/wiki/Using-an-Output-Converter-function
+def determine_directory():
+    # for compatibility with pyinstaller
+    if getattr(sys, 'frozen', False):
+        # we are running in a bundle
+        _dir = sys._MEIPASS
+    else:
+        # we are running in a normal Python environment
+        _dir = os.path.dirname(os.path.abspath(__file__))
+    return _dir
+
+
+def load_custom_commands():
+    _dir = determine_directory()
+    comm_file = os.path.join(_dir, "commands.scl")
+    if not os.path.isfile(comm_file):
+        return  # no error or anything
+    with open(comm_file) as f:
+        for line in f:
+            c, q = line.split(' ', 1)
+            custom_commands[c] = q
+
+
+# source:
+# https://github.com/mkleehammer/pyodbc/wiki/Using-an-Output-Converter-function
 def handle_datetimeoffset(dto_value):
-    # ref: https://github.com/mkleehammer/pyodbc/issues/134#issuecomment-281739794
-    tup = struct.unpack("<6hI2h", dto_value)  # e.g., (2017, 3, 16, 10, 35, 18, 0, -6, 0)
+    # see also:
+    # https://github.com/mkleehammer/pyodbc/issues/134#issuecomment-281739794
+    tup = struct.unpack("<6hI2h", dto_value)
     tweaked = [tup[i] // 100 if i == 6 else tup[i] for i in range(len(tup))]
-    return "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:07d} {:+03d}:{:02d}".format(*tweaked)
+    t = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:07d} {:+03d}:{:02d}"
+    return t.format(*tweaked)
 
 
 def connect_and_get_cursor():
@@ -440,8 +478,10 @@ def prompt_query_command():
     while True:
         lines.append(input(">"))
         last = lines[-1]
+        if last.strip()[-2:] == ";;":
+            return '\n'.join(lines)[:-1]  # Exclude extra ";"
         if last.strip().upper().startswith('GO'):
-            return '\n'.join(lines[:-1])  # Exclude GO or ;
+            return '\n'.join(lines[:-1])  # Exclude GO
         if last.startswith(":"):
             return lines[-1]  # for commands ignore previous lines
 
@@ -493,5 +533,6 @@ if __name__ == "__main__":
     user = arguments["-U"]
     password = arguments["-P"]
     conninfo = ConnParams(server, database, user, password)
+    load_custom_commands()
     connect_and_get_cursor()
     query_loop()
