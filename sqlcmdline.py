@@ -21,7 +21,7 @@ import sys
 import struct
 import operator as op
 from collections import defaultdict, namedtuple
-from datetime import datetime
+from datetime import datetime, date
 import decimal  # added for PyInstaller
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
@@ -329,7 +329,8 @@ def print_resultset(cursor):
     print()  # blank line
     # Issue #3, printing too slow. Trade off memory for speed when printing
     # a resultset
-    print("\n".join(format_str.format(*row) for row in print_ready))
+    print("\n".join(format_str.format(*row) for row in print_ready),
+          flush=True)
     # Turns out cursor.rowcount is not reliable. Ideally I woud like to
     # display the number of rows affected and how many printed. Since I can't
     # I'll settle for this alternative:
@@ -338,7 +339,8 @@ def print_resultset(cursor):
         print(f"\nRows returned: {printed_rows}\n")
     else:
         rowcount = "(unknown)" if cursor.rowcount == -1 else cursor.rowcount
-        print(f"\nRows printed: {max_rows_print}. Total rows: {rowcount}\n")
+        print(f"\nRows printed: {max_rows_print}. Total rows: {rowcount}\n",
+              flush=True)
 
 
 def format_rows(column_names, raw_rows):
@@ -357,6 +359,10 @@ def format_rows(column_names, raw_rows):
                 new_value = value
             elif isinstance(value, datetime):
                 new_len = 26
+                new_value = value.isoformat()
+            # order matters, datetime matches date :)
+            elif isinstance(value, date):
+                new_len = 10
                 new_value = value.isoformat()
             elif isinstance(value, int):
                 new_len = int_len(value)
