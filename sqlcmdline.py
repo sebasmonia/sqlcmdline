@@ -35,11 +35,11 @@ cursor = None
 conninfo = None
 
 
-def command_help(params):
+def command_help(modifiers, params):
     t = ('--Available commands--\n'
          'Syntax: :command required_parameter [optional_parameter].\n\n'
          'Common command modifiers are:\n'
-         '\t-eq: makes the next parameter an exact match, by default'
+         '\t-eq: makes the search text  parameter an exact match, by default'
          ' all parameters use LIKE comparisons\n'
          '\t-full: in some commands, will return * from '
          'INFORMATION_SCHEMA instead of a smaller subset of columns\n')
@@ -74,7 +74,7 @@ def command_help(params):
     return (None, None, None)
 
 
-def command_truncate(params):
+def command_truncate(modifiers, params):
     try:
         global max_column_width
         if not params:
@@ -90,7 +90,7 @@ def command_truncate(params):
         return PreparedCommand(None, "Invalid arguments", None)
 
 
-def command_rows(params):
+def command_rows(modifiers, params):
     try:
         global max_rows_print
         if not params:
@@ -107,7 +107,7 @@ def command_rows(params):
         return PreparedCommand(None, "Invalid arguments", None)
 
 
-def command_tables(params):
+def command_tables(modifiers, params):
     q = f"SELECT * FROM INFORMATION_SCHEMA.TABLES "
     if params:
         if len(params) == 1:
@@ -117,14 +117,14 @@ def command_tables(params):
     return PreparedCommand(q, None, None)
 
 
-def command_columns(params):
+def command_columns(modifiers, params):
     try:
-        cols = ("*" if "-full" in params else
+        cols = ("*" if "-full" in modifiers else
                 "TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, "
                 "COLUMN_NAME, DATA_TYPE")
         q = f"SELECT {cols} FROM INFORMATION_SCHEMA.COLUMNS "
-        if params[0] == "-eq":
-            q += f"WHERE TABLE_NAME = '{params[1]}'"
+        if "-eq" in modifiers:
+            q += f"WHERE TABLE_NAME = '{params[0]}'"
         else:
             q += f"WHERE TABLE_NAME LIKE '%{params[0]}%'"
         return PreparedCommand(q, None, None)
@@ -134,49 +134,48 @@ def command_columns(params):
         return PreparedCommand(None, str(e), None)
 
 
-def command_views(params):
+def command_views(modifiers, params):
     try:
-        cols = ("*" if "-full" in params else
+        cols = ("*" if "-full" in modifiers else
                 "TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME,"
                 " CHECK_OPTION, IS_UPDATABLE")
         q = f"SELECT {cols} FROM INFORMATION_SCHEMA.VIEWS "
-        # params can be either -full, viewname -full, just viewname, or empty
-        if params and not all(p == '-full' for p in params):
+        if params:
             q += f"WHERE TABLE_NAME LIKE '%{params[0]}%'"
         return PreparedCommand(q, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments")
 
 
-def command_procedures(params):
+def command_procedures(modifiers, params):
     try:
-        cols = ("*" if "-full" in params else
+        cols = ("*" if "-full" in modifiers else
                 "ROUTINE_CATALOG, ROUTINE_SCHEMA, ROUTINE_NAME, "
                 "DATA_TYPE, CREATED, LAST_ALTERED")
         q = (f"SELECT {cols} FROM INFORMATION_SCHEMA.ROUTINES WHERE "
              f"ROUTINE_TYPE = 'PROCEDURE' ")
-        if params and not all(p == '-full' for p in params):
+        if params:
             q += f"AND ROUTINE_NAME LIKE '%{params[0]}%'"
         return PreparedCommand(q, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments", None)
 
 
-def command_functions(params):
+def command_functions(modifiers, params):
     try:
-        cols = ("*" if "-full" in params else
+        cols = ("*" if "-full" in modifiers else
                 "ROUTINE_CATALOG, ROUTINE_SCHEMA, ROUTINE_NAME, "
                 "DATA_TYPE, CREATED, LAST_ALTERED")
         q = (f"SELECT {cols} FROM INFORMATION_SCHEMA.ROUTINES WHERE "
              f"ROUTINE_TYPE = 'FUNCTION' ")
-        if params and not all(p == '-full' for p in params):
+        if params:
             q += f"AND ROUTINE_NAME LIKE '%{params[0]}%'"
         return PreparedCommand(q, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments", None)
 
 
-def command_source(params):
+def command_source(modifiers, params):
     try:
         global max_column_width
         global max_rows_print
@@ -197,7 +196,7 @@ def command_source(params):
         return PreparedCommand(None, str(e), None)
 
 
-def command_dependencies(params):
+def command_dependencies(modifiers, params):
     try:
         global max_column_width
         global max_rows_print
@@ -226,7 +225,7 @@ def command_dependencies(params):
         return PreparedCommand(None, str(e), None)
 
 
-def command_file(params):
+def command_file(modifiers, params):
     global cursor
     try:
         # if the path had spaces it was space-split by
@@ -260,7 +259,7 @@ def command_file(params):
         return PreparedCommand(None, str(e), None)
 
 
-def command_databases(params):
+def command_databases(modifiers, params):
     q = f"SELECT name as 'Database Name' FROM master.dbo.sysdatabases "
     if params:
         if len(params) == 1:
@@ -270,7 +269,7 @@ def command_databases(params):
     return PreparedCommand(q, None, None)
 
 
-def command_use(params):
+def command_use(modifiers, params):
     global conninfo
     message = None
     if params and len(params) == 1:
@@ -411,12 +410,14 @@ def decimal_len(decimal_number):
 
 def process_command(line_typed):
     try:
-        command_name, *params = line_typed.split(" ")
+        command_name, *rest = line_typed.split(" ")
     except:
         command_name = "Nope"
+    modifiers = [x for x in rest if x.startswith("-")]
+    params = [x for x in rest if x not in modifiers]
     if command_name in commands:
         command_handler = commands[command_name]
-        query, error, cb = command_handler(params)
+        query, error, cb = command_handler(modifiers, params)
     elif command_name in custom_commands:
         template = custom_commands[command_name]
         query = template.format(*params)
@@ -524,7 +525,7 @@ def query_loop():
                     callback()
                     callback = None
         except Exception as e:
-            print("---ERROR---\n")
+            print("---ERROR---\n", flush=True)
             traceback.print_exc()
             print("\n---ERROR---")
         print(flush=True)  # blank line
