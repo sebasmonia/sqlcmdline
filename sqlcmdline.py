@@ -243,7 +243,7 @@ def command_file(modifiers, params):
                     rcount = cursor.rowcount  # -1 for "select" queries
                     if rcount == -1:
                         try:
-                            print_results(cursor)
+                            output_results(cursor)
                         except pyodbc.ProgrammingError as pe:
                             # I should really filter for the specific message
                             # "No results.  Previous SQL was not a query."
@@ -311,10 +311,22 @@ def text_formatter(value):
     return value
 
 
-def print_results(cursor):
-    print_resultset(cursor)
-    while cursor.nextset():
+def output_results(cursor):
+    try:
         print_resultset(cursor)
+    except pyodbc.ProgrammingError as e:
+        if "Previous SQL was not a query." in str(e):
+            pass
+        else:
+            raise e
+    while cursor.nextset():
+        try:
+            print_resultset(cursor)
+        except pyodbc.ProgrammingError as e:
+            if "Previous SQL was not a query." in str(e):
+                continue
+            else:
+                raise e
 
 
 def print_resultset(cursor):
@@ -518,7 +530,7 @@ def query_loop():
                 cursor.execute(query)
                 rcount = cursor.rowcount  # -1 for "select" queries
                 if rcount == -1:
-                    print_results(cursor)
+                    output_results(cursor)
                 else:
                     print("\nRows affected:", rcount, flush=True)
                 if callback:
