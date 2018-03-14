@@ -1,3 +1,4 @@
 :top SELECT TOP {0} * FROM {1}
 :top10 SELECT TOP 10 * FROM {0}
-:last10 SELECT TOP 10 * FROM {0} ORDER BY 1 DESC
+:all SELECT * FROM {0}
+:log SELECT TOP 50 * FROM SomeLoggingTable ORDER BY [ID] DESC
