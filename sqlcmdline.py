@@ -31,7 +31,7 @@ max_column_width = 100
 max_rows_print = 50
 chars_to_cleanup = str.maketrans("\n\t\r", "   ")
 
-cursor = None
+connection = None
 conninfo = None
 
 
@@ -68,7 +68,9 @@ def command_help(modifiers, params):
          f'parsing of the file will take place.\n'
          f':dbs database_name{sep}List all databases, or databases "like '
          f'database_name".\n'
-         f':use database_name{sep}changes the connection to "database_name".'
+         f':use database_name{sep}changes the connection to "database_name".\n'
+         f':timeout [seconds]{sep}sets the command timeout. '
+         f'Default: 30 seconds.'
          f'\n')
     print(t)
     return (None, None, None)
@@ -226,7 +228,8 @@ def command_dependencies(modifiers, params):
 
 
 def command_file(modifiers, params):
-    global cursor
+    global connection
+    cursor = connection.cursor()
     try:
         # if the path had spaces it was space-split by
         # the process_command function
@@ -277,13 +280,29 @@ def command_use(modifiers, params):
         conninfo = ConnParams(conninfo.server, params[0], conninfo.user,
                               conninfo.password)
         try:
-            connect_and_get_cursor()
+            create_connection()
         except:
             conninfo = old_conn
             message = f"Connection to database {params[0]} failed."
     else:
         message = "Invalid arguments"
     return PreparedCommand(None, message, None)
+
+
+def command_timeout(modifiers, params):
+    try:
+        global connection
+        if not params:
+            print(f'Current ":timeout" value: {connection.timeout}')
+        else:
+            timeout = int(params[0])
+            if timeout < 0:
+                raise
+            connection.timeout = timeout
+            print(f"Command timeout set to {timeout} seconds.")
+        return PreparedCommand(None, None, None)
+    except Exception as e:
+        return PreparedCommand(None, "Invalid arguments", None)
 
 
 commands = {":help": command_help,
@@ -298,7 +317,8 @@ commands = {":help": command_help,
             ":deps": command_dependencies,
             ":file": command_file,
             ":dbs": command_databases,
-            ":use": command_use}
+            ":use": command_use,
+            ":timeout": command_timeout}
 
 custom_commands = {}
 
@@ -476,8 +496,8 @@ def handle_datetimeoffset(dto_value):
     return t.format(*tweaked)
 
 
-def connect_and_get_cursor():
-    global cursor
+def create_connection():
+    global connection
     global conninfo
     connection = (f"Driver={{SQL Server Native Client 11.0}};"
                   f"Server={conninfo.server};"
@@ -488,8 +508,8 @@ def connect_and_get_cursor():
         connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
     conn = pyodbc.connect(connection, autocommit=True)
     conn.add_output_converter(-155, handle_datetimeoffset)
-    conn.timeout = 30  # 30 second timeout for queries. Should be configurable.
-    cursor = conn.cursor()
+    conn.timeout = 30
+    connection = conn
 
 
 def prompt_query_command():
@@ -506,7 +526,7 @@ def prompt_query_command():
 
 
 def query_loop():
-    global cursor
+    global connection
     global conninfo
     print(f'Connected to server {conninfo.server} '
           f'database {conninfo.database}')
@@ -527,6 +547,7 @@ def query_loop():
                     print(f"Command error: {cmd_error}")
             if query:
                 # print("\n----------\n", query, "\n----------\n")
+                cursor = connection.cursor()
                 cursor.execute(query)
                 rcount = cursor.rowcount  # -1 for "select" queries
                 if rcount == -1:
@@ -553,5 +574,5 @@ if __name__ == "__main__":
     password = arguments["-P"]
     conninfo = ConnParams(server, database, user, password)
     load_custom_commands()
-    connect_and_get_cursor()
+    create_connection()
     query_loop()
