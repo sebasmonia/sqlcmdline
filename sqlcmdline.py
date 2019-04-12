@@ -1,5 +1,5 @@
 # !/usr/bin/env python3
-"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database>
+"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database> -p <port> -D <driver>
                                       (-E | -U <user> -P <password>)
 
 Small command line utility to query MSSQL databases. The parameters are named
@@ -7,6 +7,8 @@ to match the official tool, "sqlcmd".
 
 Arguments:
   -S <server>       Server name.
+  -p <port>         SQL Server port
+  -D <driver>       SQL Server driver
   -d <database>     Database to open.
   -E                Use Integrated Security.
   -U <user>         SQL Login user
@@ -25,7 +27,7 @@ from datetime import datetime, date
 import decimal  # added for PyInstaller
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
-ConnParams = namedtuple("ConnParams", "server database user password")
+ConnParams = namedtuple("ConnParams", "server database user password driver port")
 
 max_column_width = 100
 max_rows_print = 50
@@ -278,7 +280,7 @@ def command_use(modifiers, params):
     if params and len(params) == 1:
         old_conn = conninfo
         conninfo = ConnParams(conninfo.server, params[0], conninfo.user,
-                              conninfo.password)
+                              conninfo.password, conninfo.driver, conninfo.port)
         try:
             create_connection()
         except:
@@ -499,13 +501,15 @@ def handle_datetimeoffset(dto_value):
 def create_connection():
     global connection
     global conninfo
-    connection = (f"Driver={{SQL Server Native Client 11.0}};"
+    connection = (f"Driver={conninfo.driver};"
+                  f"Port={conninfo.port};"
                   f"Server={conninfo.server};"
                   f"Database={conninfo.database};")
     if not conninfo.user:
         connection += "Trusted_Connection=Yes;"
     else:
         connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
+    print("c: %s"%(connection,))
     conn = pyodbc.connect(connection, autocommit=True)
     conn.add_output_converter(-155, handle_datetimeoffset)
     conn.timeout = 30
@@ -572,7 +576,9 @@ if __name__ == "__main__":
     database = arguments["-d"]
     user = arguments["-U"]
     password = arguments["-P"]
-    conninfo = ConnParams(server, database, user, password)
+    port = arguments["-p"]
+    driver = arguments["-D"]
+    conninfo = ConnParams(server, database, user, password, driver, port)
     load_custom_commands()
     create_connection()
     query_loop()
