@@ -33,7 +33,7 @@ from datetime import datetime, date
 import decimal  # added for PyInstaller
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
-ConnParams = namedtuple("ConnParams", "server database user password driver port")
+ConnParams = namedtuple("ConnParams", "server database user password driver")
 
 max_column_width = 100
 max_rows_print = 50
@@ -289,7 +289,7 @@ def command_use(modifiers, params):
     if params and len(params) == 1:
         old_conn = conninfo
         conninfo = ConnParams(conninfo.server, params[0], conninfo.user,
-                              conninfo.password, conninfo.driver, conninfo.port)
+                              conninfo.password, conninfo.driver)
         try:
             create_connection()
         except:
@@ -513,13 +513,10 @@ def create_connection():
     connection = (f"Driver={conninfo.driver};"
                   f"Server={conninfo.server};"
                   f"Database={conninfo.database};")
-    if conninfo.port:
-        connection += f"Port={conninfo.port};"
     if not conninfo.user:
         connection += "Trusted_Connection=Yes;"
     else:
         connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
-    print("c: %s"%(connection,))
     conn = pyodbc.connect(connection, autocommit=True)
     conn.add_output_converter(-155, handle_datetimeoffset)
     conn.timeout = 30
@@ -582,6 +579,7 @@ def query_loop():
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
+    server = arguments["-S"]
     database = arguments["-d"]
     user = arguments["-U"]
     password = arguments["-P"]
@@ -589,13 +587,7 @@ if __name__ == "__main__":
     driver = arguments["--driver"]
     if not driver:
         driver = "{SQL Server}"
-    server = arguments["-S"]
-    port = None
-    port_ndx = server.rfind(",")
-    if port_ndx != -1:
-        server = server[:port_ndx]
-        port = server[port_ndx+1:]
-    conninfo = ConnParams(server, database, user, password, driver, port)
+    conninfo = ConnParams(server, database, user, password, driver)
     load_custom_commands()
     create_connection()
     query_loop()
