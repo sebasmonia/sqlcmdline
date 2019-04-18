@@ -1,18 +1,24 @@
 # !/usr/bin/env python3
-"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database> -p <port> -D <driver>
-                                      (-E | -U <user> -P <password>)
+"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database>
+                     [--driver <odbc_driver>]
+                     (-E | -U <user> -P <password>)
 
-Small command line utility to query MSSQL databases. The parameters are named
-to match the official tool, "sqlcmd".
+Small command line utility to query MSSQL databases. The required parameters
+are named to match the official tool, "sqlcmd".
 
-Arguments:
-  -S <server>       Server name.
-  -p <port>         SQL Server port
-  -D <driver>       SQL Server driver
-  -d <database>     Database to open.
-  -E                Use Integrated Security.
+Required arguments:
+  -S <server>       Server name. Optionaly you can specify a port with the
+                    format <servername,port>
+  -d <database>     Database to open
+
+And then either...
+  -E                Use Integrated Security
+           -OR-
   -U <user>         SQL Login user
   -P <password>     SQL Login password
+
+Optional arguments:
+  --driver <driver> SQL Server ODBC driver name, defaults to {SQL Server}
 """
 from docopt import docopt
 import traceback
@@ -74,6 +80,9 @@ def command_help(modifiers, params):
          f':timeout [seconds]{sep}sets the command timeout. '
          f'Default: 30 seconds.'
          f'\n')
+    print(t)
+    t = ('Custom commands loaded from commands.scl:\n' +
+         ', '.join(custom_commands.keys()))
     print(t)
     return (None, None, None)
 
@@ -502,9 +511,10 @@ def create_connection():
     global connection
     global conninfo
     connection = (f"Driver={conninfo.driver};"
-                  f"Port={conninfo.port};"
                   f"Server={conninfo.server};"
                   f"Database={conninfo.database};")
+    if conninfo.port:
+        connection += f"Port={conninfo.port};"
     if not conninfo.user:
         connection += "Trusted_Connection=Yes;"
     else:
@@ -572,12 +582,19 @@ def query_loop():
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
-    server = arguments["-S"]
     database = arguments["-d"]
     user = arguments["-U"]
     password = arguments["-P"]
-    port = arguments["-p"]
-    driver = arguments["-D"]
+    port = None
+    driver = arguments["--driver"]
+    if not driver:
+        driver = "{SQL Server}"
+    server = arguments["-S"]
+    port = None
+    port_ndx = server.rfind(",")
+    if port_ndx != -1:
+        server = server[:port_ndx]
+        port = server[port_ndx+1:]
     conninfo = ConnParams(server, database, user, password, driver, port)
     load_custom_commands()
     create_connection()
