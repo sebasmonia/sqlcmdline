@@ -34,10 +34,12 @@ Optional arguments:
 -S, -d, -E and -U & -P work just like their `sqlcmd` counterparts. That means most tools that interact with `sqlcmd` should be able
 to use `sqlcmdline` with no changes to the parameter list.
 
-*Coming soon*: read password from environment variable or prompt for it, just like `sqlcmd` does.
+**Coming soon**: read password from environment variable or prompt for it, just like `sqlcmd` does.
 
 ## Contributors 
 
 Sebastián Monía - https://github.com/sebasmonia
+
 Hodge - https://github.com/sukeyisme
+
 Kevin Brubeck Unhammer - https://github.com/unhammer
