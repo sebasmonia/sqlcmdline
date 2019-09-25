@@ -72,8 +72,9 @@ def command_help(modifiers, params):
          f':src obj.name{sep}Will call "sp_helptext obj.name". Results won\'t'
          f' be truncated.\n'
          f':deps [to|from] obj.name{sep}Show dependencies to/from obj.name.\n'
-         f':file path{sep}Opens a file and runs the script. No checking/'
-         f'parsing of the file will take place.\n'
+         f':file [-enc] path{sep}Opens a file and runs the script. No checking/'
+         f'parsing of the file will take place. Use -enc to change the encoding\n '
+         f'used to read the file. Examples: -utf8, -cp1250, -latin_1\n'
          f':dbs database_name{sep}List all databases, or databases "like '
          f'database_name".\n'
          f':use database_name{sep}changes the connection to "database_name".\n'
@@ -241,19 +242,26 @@ def command_dependencies(modifiers, params):
 def command_file(modifiers, params):
     global connection
     cursor = connection.cursor()
+    enc = None
     try:
+        if modifiers:
+            enc = modifiers[0][1:]
+            print(f"Opening file with encoding {enc}\n")
         # if the path had spaces it was space-split by
         # the process_command function
-        path = " ".join(params)
+        path = " ".join(params).strip()
         if path.startswith('"') and path.endswith('"'):
             # typical in "Copy as path" option from Explorer
             path = path[1:-1]
         command = []
-        with open(path, 'r') as script:
+        line_count = 0
+        command_count = 0
+        with open(path, 'r', encoding=enc) as script:
             for line in script:
+                line_count = line_count + 1
                 if line.strip().upper().startswith('GO'):
                     # TODO: add logic to support GO [count]
-                    cursor.execute(''.join(command))
+                    cursor.execute('\n'.join(command))
                     rcount = cursor.rowcount  # -1 for "select" queries
                     if rcount == -1:
                         try:
@@ -264,10 +272,12 @@ def command_file(modifiers, params):
                             print("Block executed, no rows returned or "
                                   "rowcount available")
                     else:
-                        print("\nRows affected:", rcount, flush=True)
+                        print("Rows affected:", rcount, flush=True)
                     command = []
+                    command_count = command_count + 1
                 else:
                     command.append(line)
+        print(f"\nCompleted processing file with {command_count} commands in {line_count} lines")
         return PreparedCommand(None, None, None)
     except Exception as e:
         return PreparedCommand(None, str(e), None)
