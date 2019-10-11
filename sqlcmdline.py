@@ -262,17 +262,18 @@ def command_file(modifiers, params):
                 if line.strip().upper().startswith('GO'):
                     # TODO: add logic to support GO [count]
                     cursor.execute('\n'.join(command))
-                    rcount = cursor.rowcount  # -1 for "select" queries
-                    if rcount == -1:
-                        try:
-                            output_results(cursor)
-                        except pyodbc.ProgrammingError as pe:
-                            # I should really filter for the specific message
-                            # "No results.  Previous SQL was not a query."
-                            print("Block executed, no rows returned or "
-                                  "rowcount available")
-                    else:
-                        print("Rows affected:", rcount, flush=True)
+                    rcount = cursor.rowcount
+                    # There used to be a check here, based on rcount, but this
+                    # version that tries prints + always shows rows affected
+                    # allows supporting MySql and still works for SQL Server!!!
+                    try:
+                        output_results(cursor)
+                    except pyodbc.ProgrammingError as pe:
+                        # I should really filter for the specific message
+                        # "No results.  Previous SQL was not a query."
+                        print("Block executed, no rows returned or "
+                              "rowcount available")
+                    print("Rows affected:", rcount, flush=True)
                     command = []
                     command_count = command_count + 1
                 else:
@@ -376,6 +377,10 @@ def print_resultset(cursor):
         odbc_rows = cursor.fetchmany(max_rows_print)
     else:
         odbc_rows = cursor.fetchall()
+
+    rowcount = cursor.rowcount
+    if not odbc_rows:
+        return # no rows returned!
     column_names = [text_formatter(column[0]) for column in cursor.description]
     format_str, print_ready = format_rows(column_names, odbc_rows)
     print()  # blank line
@@ -383,16 +388,20 @@ def print_resultset(cursor):
     # a resultset
     print("\n".join(format_str.format(*row) for row in print_ready),
           flush=True)
-    # Turns out cursor.rowcount is not reliable. Ideally I woud like to
-    # display the number of rows affected and how many printed. Since I can't
-    # I'll settle for this alternative:
+    # Try to determine if all rows returned were printed
+    # MS SQL Server doesn't report the total rows SELECTed,
+    # but for example MySql does.
     printed_rows = len(odbc_rows)
     if printed_rows < max_rows_print or max_rows_print == 0:
-        print(f"\nRows returned: {printed_rows}\n")
-    else:
-        rowcount = "(unknown)" if cursor.rowcount == -1 else cursor.rowcount
-        print(f"\nRows printed: {max_rows_print}. Total rows: {rowcount}\n",
-              flush=True)
+        # We printed everything via :rows 0, or less than the max to print
+        # in which case we can deduct there were no more rows
+        rowcount = printed_rows
+    if rowcount == -1:
+        # Curse you, MS SQL Driver!
+        rowcount = "(unknown)"
+    # We tried our best! report the numbers
+    print(f"\nRows printed: {printed_rows}/{rowcount}\n",
+          flush=True)
 
 
 def format_rows(column_names, raw_rows):
@@ -570,11 +579,12 @@ def query_loop():
                 # print("\n----------\n", query, "\n----------\n")
                 cursor = connection.cursor()
                 cursor.execute(query)
-                rcount = cursor.rowcount  # -1 for "select" queries
-                if rcount == -1:
-                    output_results(cursor)
-                else:
-                    print("\nRows affected:", rcount, flush=True)
+                rcount = cursor.rowcount
+                # There used to be a check here, based on rcount, but this
+                # version that tries prints + always shows rows affected
+                # allows supporting MySql and still works for SQL Server!!!
+                output_results(cursor)
+                print("Rows affected:", rcount, flush=True)
                 if callback:
                     callback()
                     callback = None
