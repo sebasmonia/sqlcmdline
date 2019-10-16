@@ -79,7 +79,7 @@ Common command modifiers are:
 ```
 
 Notes:
-* `:use` starts a new ODBC connection to the same server to `database_name`.
+* `:use` starts a new ODBC connection to `database_name` in the current server.
 * `:tables`, `:cols`, `:views`, `:procs` and `:funcs` use INFORMATION_SCHEMA so they should work across many engines
 * `:dbs` currently supports MySQL, MSSQL and Postgres.
 * `:deps` and `:src` are MSSQL-only
@@ -101,14 +101,14 @@ the query `SELECT * FROM MyLogTable WHERE Username = 'admin'`.
 
 If you are using this package to connect to a MS SQL Server database, the configuration needed is:
 
-```(elisp)
+```elisp
 (setq sql-ms-options nil) ;; sqlcmdline doesn't support any of the default parameters here
 (setq sql-ms-program "sqlcmdline") ;; if using Windows, set this to "python sqlcmdline.py", or a version compiled with PyInstaller
 ```
 If you would like to connect to a different database engine, then the setup is a bit more involved. We want to lift many parameters 
 from the SQL Server config, but adjust others for our engine of choice. See below a setup for MySQL:
 
-```(elisp)
+```elisp
 (sql-add-product 'MySQL-ODBC "MySQL-ODBC"
    '(:font-lock sql-mode-mysql-font-lock-keywords                          ;; we want the font lock of our engine of interest
                 :sqli-program "sqlcmdline"                                 ;; notes above about this parameter apply here
@@ -124,7 +124,7 @@ from the SQL Server config, but adjust others for our engine of choice. See belo
 
 Assuming you made the changes listed above, here is how you could add a connection for each engine:
 
-```(elisp)
+```elisp
 (setq sql-connection-alist
       '(("SQLServer-UserPass"
          (sql-product 'ms)
