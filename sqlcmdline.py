@@ -285,12 +285,30 @@ def command_file(modifiers, params):
 
 
 def command_databases(modifiers, params):
-    q = f"SELECT name as 'Database Name' FROM master.dbo.sysdatabases "
-    if params:
-        if len(params) == 1:
+    # this is very crude way to selecting the right statement for each engine
+    # it could (should...) be configurable, extensible, etc.
+    # but all other commands take advantage of INFORMATION_SCHEMA, taking the lazy
+    # way out of this one only.
+    # PS: there's also the option of a custom command
+    global conninfo
+
+    if len(params) > 1:
+        return PreparedCommand(None, "Invalid arguments", None)
+
+    q = ""
+    if "SQL Server" in conninfo.driver:
+        q = f"SELECT name as 'Database Name' FROM master.dbo.sysdatabases "
+        if params:
             q += f"WHERE name LIKE '%{params[0]}%'"
-        else:
-            return PreparedCommand(None, "Invalid arguments", None)
+    elif "MySQL" in conninfo.driver:
+        q = f"SHOW DATABASES  "
+        if params:
+            q += f"LIKE '%{params[0]}%'"
+    elif "PostgreSQL" in conninfo.driver:
+        q = f"SELECT datname FROM pg_database "
+        if params: # test
+            q += f"WHERE datname LIKE '%{params[0]}%'"
+    
     return PreparedCommand(q, None, None)
 
 
