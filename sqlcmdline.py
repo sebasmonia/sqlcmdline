@@ -3,8 +3,8 @@
                      [--driver <odbc_driver>]
                      (-E | -U <user> -P <password>)
 
-Small command line utility to query MSSQL databases. The required parameters
-are named to match the official tool, "sqlcmd".
+Small command line utility to query databases via ODBC. The required parameters
+are named to match the official MSSQL tool, "sqlcmd".
 
 Required arguments:
   -S <server>       Server name. Optionaly you can specify a port with the
@@ -18,7 +18,7 @@ And then either...
   -P <password>     SQL Login password
 
 Optional arguments:
-  --driver <driver> SQL Server ODBC driver name, defaults to {SQL Server}
+  --driver <driver> ODBC driver name, defaults to {SQL Server}
 """
 from docopt import docopt
 import traceback
