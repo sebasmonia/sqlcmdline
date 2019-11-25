@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Usage: sqlcmdline.py [-h | --help] -S <server> -d <database>
                      [--driver <odbc_driver>]
                      (-E | -U <user> -P <password>)
@@ -8,7 +8,7 @@ are named to match the official MSSQL tool, "sqlcmd".
 
 Required arguments:
   -S <server>       Server name. Optionaly you can specify a port with the
-                    format <servername,port>
+                    format <servername,port>, or use a DNS
   -d <database>     Database to open
 
 And then either...
@@ -18,7 +18,9 @@ And then either...
   -P <password>     SQL Login password
 
 Optional arguments:
-  --driver <driver> ODBC driver name, defaults to {SQL Server}
+  --driver <driver> ODBC driver name, defaults to {SQL Server}. Use the value
+                    "DSN" to use a Data Source Name in the <server>
+                    parameter instead of an actual server
 """
 from docopt import docopt
 import traceback
@@ -550,6 +552,11 @@ def create_connection():
     connection = (f"Driver={conninfo.driver};"
                   f"Server={conninfo.server};"
                   f"Database={conninfo.database};")
+    # override the connection string format for named connections (DSN)
+    # For example for MSSQL under Linux
+    if conninfo.driver == "DSN":
+        connection = (f"DSN={conninfo.server};"
+                      f"Database={conninfo.database};")
     if not conninfo.user:
         connection += "Trusted_Connection=Yes;"
     else:
