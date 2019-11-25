@@ -33,7 +33,7 @@ are named to match the official MSSQL tool, "sqlcmd".
 
 Required arguments:
   -S <server>       Server name. Optionaly you can specify a port with the
-                    format <servername,port>
+                    format <servername,port>, or use a DNS
   -d <database>     Database to open
 
 And then either...
@@ -43,11 +43,16 @@ And then either...
   -P <password>     SQL Login password
 
 Optional arguments:
-  --driver <driver> ODBC driver name, defaults to {SQL Server}
+  --driver <driver> ODBC driver name, defaults to {SQL Server}. Use the value
+                    "DSN" to use a Data Source Name in the <server>
+                    parameter instead of an actual server
 ```
 
 -S, -d, -E and -U & -P work just like their `sqlcmd` counterparts. That means most tools that interact with `sqlcmd` should be able
 to use `sqlcmdline` with no changes to the parameter list.
+
+Under Linux, to connect to MSSQL you can use a DSN, see https://github.com/mkleehammer/pyodbc/wiki/Connecting-to-SQL-Server-from-RHEL-6-or-Centos-7 for
+more details. If you go that route, specify `--driver DSN` and use the DSN name in the `<server>`.
 
 ## Commands
 
@@ -99,12 +104,19 @@ the query `SELECT * FROM MyLogTable WHERE Username = 'admin'`.
 
 ## Emacs usage tips
 
+For Emacs versions < 27, there's a parameter missing in the `sql.el` setup for Microsoft SQL Server, you need to add it:
+
+```elisp
+(plist-put (alist-get 'ms sql-product-alist) :prompt-cont-regexp "^[0-9]*>")
+```
+
 If you are using this package to connect to a MS SQL Server database, the configuration needed is:
 
 ```elisp
 (setq sql-ms-options nil) ;; sqlcmdline doesn't support any of the default parameters here
 (setq sql-ms-program "sqlcmdline") ;; if using Windows, set this to "python sqlcmdline.py", or a version compiled with PyInstaller
 ```
+
 If you would like to connect to a different database engine, then the setup is a bit more involved. We want to lift many parameters 
 from the SQL Server config, but adjust others for our engine of choice. See below a setup for MySQL:
 
