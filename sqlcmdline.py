@@ -82,10 +82,14 @@ def command_help(modifiers, params):
          f':use database_name{sep}changes the connection to "database_name".\n'
          f':timeout [seconds]{sep}sets the command timeout. '
          f'Default: 30 seconds.'
-         f'\n')
+         f':addcommand [name] [query text]{sep}creates a custom command for the current '
+         f'session only, same single line format as commands.scl. Use :name to call it.')
     print(t)
-    t = ('Custom commands loaded from commands.scl:\n' +
+    t = ('\nCustom commands loaded from commands.scl:\n' +
          ', '.join(custom_commands.keys()))
+    print(t)
+    t = ('\nCustom commands for this session:\n' +
+         ', '.join(session_custom_commands.keys()))
     print(t)
     return (None, None, None)
 
@@ -347,6 +351,21 @@ def command_timeout(modifiers, params):
         return PreparedCommand(None, "Invalid arguments", None)
 
 
+def command_addcommand(name, query_template):
+    try:
+        global session_custom_commands
+        # in case it's all spaces
+        query_template = query_template.strip()
+        if not query_template:
+            return PreparedCommand(None, "Invalid arguments", None)
+        else:
+            session_custom_commands[":" + name] = query_template
+            print(f"Command :{name} added. **SYNTAX WAS NOT CHECKED**")
+        return PreparedCommand(None, None, None)
+    except Exception as e:
+        return PreparedCommand(None, e, None)
+
+
 commands = {":help": command_help,
             ":tables": command_tables,
             ":cols": command_columns,
@@ -361,9 +380,12 @@ commands = {":help": command_help,
             ":dbs": command_databases,
             ":use": command_use,
             ":timeout": command_timeout}
+# ":addcommand" is not part of the dict but it is
+# a valid value
 
 custom_commands = {}
 
+session_custom_commands = {}
 
 def text_formatter(value):
     value = str(value)
@@ -497,17 +519,26 @@ def process_command(line_typed):
         command_name = "Nope"
     modifiers = [x for x in rest if x.startswith("-")]
     params = [x for x in rest if x not in modifiers]
-    if command_name in commands:
+    template = None
+    if command_name == ":addcommand":
+        # treat this as an exception, pass the first parameter as command
+        # name, and re-merge rest[1:] since anything starting with - is
+        # not a modified but part of the query
+        query, error, cb = command_addcommand(rest[0], " ".join(rest[1:]))
+    elif command_name in commands:
         command_handler = commands[command_name]
         query, error, cb = command_handler(modifiers, params)
     elif command_name in custom_commands:
         template = custom_commands[command_name]
-        query = template.format(*params)
-        error = None
-        cb = None
+    elif command_name in session_custom_commands:
+        template = session_custom_commands[command_name]
     else:
         t = "Invalid command name. Use :help for a list of available commands."
         return None, t, None
+    if template:  # either a custom command or a session command
+        query = template.format(*params)
+        error = None
+        cb = None
     if not error and query:
         print(f"Query: {query}")
     return query, error, cb
