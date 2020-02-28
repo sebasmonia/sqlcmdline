@@ -582,15 +582,17 @@ def handle_datetimeoffset(dto_value):
 def create_connection():
     global connection
     global conninfo
-    connection = (f"Driver={conninfo.driver};"
-                  f"Server={conninfo.server};"
-                  f"Database={conninfo.database};")
-    # override the connection string format for named connections (DSN)
-    # For example for MSSQL under Linux
+    # After the connection update of 2020-02-27, all parameters are optional
+    # with the intent of providing maximum flexibility
     if conninfo.driver == "DSN":
-        connection = (f"DSN={conninfo.server};"
-                      f"Database={conninfo.database};")
-    # When no -E or user/pass is provided, then that section is skipped.
+        connection = f"DSN={conninfo.server};"
+    else:
+        connection = f"Driver={conninfo.driver};"
+    if conninfo.server:
+        connection += f"Server={conninfo.server};"
+    if conninfo.database:
+        connection += f"Database={conninfo.database};"
+    # When no -E or user/pass is provided, then the section is skipped.
     # This is the case for SQLite
     if conninfo.intsec:
         connection += "Trusted_Connection=Yes;"
@@ -618,14 +620,17 @@ def prompt_query_command():
 def query_loop():
     global connection
     global conninfo
-    print(f'Connected to server {conninfo.server} '
-          f'database {conninfo.database}')
+    db_name = conninfo.database if conninfo.database else "-"
+    server_name = conninfo.server if conninfo.server else "-"
+    prompt = f"{server_name}@{db_name}"
+    print(f'Connected to server {server_name} '
+          f'database {db_name}')
     print()
     print('Special commands are prefixed with ":". For example, use ":exit" '
           'or ":quit" to finish your session. Everything else is sent '
           'directly to the server using ODBC.')
     print('Use ":help" to get a list of commands available')
-    print(f"{conninfo.server}@{conninfo.database}")
+    print(prompt)
     query = prompt_query_command()
     callback = None
     while query not in (":exit", ":quit"):
@@ -653,7 +658,7 @@ def query_loop():
             traceback.print_exc()
             print("\n---ERROR---")
         print(flush=True)  # blank line
-        print(f"{conninfo.server}@{conninfo.database}")
+        print(prompt)
         query = prompt_query_command()
 
 
