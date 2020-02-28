@@ -24,28 +24,30 @@ Latest version has improved compatibility with MySQL and hopefully other DB engi
 Let's pretend the docopt help is good enough that I can use it here as documentation :)
 
 ```
-Usage: sqlcmdline.py [-h | --help] -S <server> -d <database>
+Usage: sqlcmdline.py [-h | --help]
+                     [-S <server> -d <database>]
+                     [-E | -U <user> -P <password>]
                      [--driver <odbc_driver>]
-                     (-E | -U <user> -P <password>)
 
-Small command line utility to query databases via ODBC. The required parameters
-are named to match the official MSSQL tool, "sqlcmd".
+Small command line utility to query databases via ODBC. The parameter names
+were chosen to match the official MSSQL tool, "sqlcmd", but all are optional
+to provide maximum flexibility (support SQLite, DNS, etc.)
 
-Required arguments:
   -S <server>       Server name. Optionaly you can specify a port with the
                     format <servername,port>, or use a DNS
+
   -d <database>     Database to open
 
-And then either...
   -E                Use Integrated Security
            -OR-
   -U <user>         SQL Login user
   -P <password>     SQL Login password
+           -OR-
+  (Nothing at all, for example, SQLite, or DNS includes security)
 
-Optional arguments:
   --driver <driver> ODBC driver name, defaults to {SQL Server}. Use the value
                     "DSN" to use a Data Source Name in the <server>
-                    parameter instead of an actual server
+                    parameter instead of an actual servername
 ```
 
 -S, -d, -E and -U & -P work just like their `sqlcmd` counterparts. That means most tools that interact with `sqlcmd` should be able

@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""Usage: sqlcmdline.py [-h | --help] -S <server> -d <database>
+"""Usage: sqlcmdline.py [-h | --help]
+                     [-S <server> -d <database>]
+                     [-E | -U <user> -P <password>]
                      [--driver <odbc_driver>]
-                     (-E | -U <user> -P <password>)
 
-Small command line utility to query databases via ODBC. The required parameters
-are named to match the official MSSQL tool, "sqlcmd".
+Small command line utility to query databases via ODBC. The parameter names
+were chosen to match the official MSSQL tool, "sqlcmd", but all are optional
+to provide maximum flexibility (support SQLite, DNS, etc.)
 
-Required arguments:
   -S <server>       Server name. Optionaly you can specify a port with the
                     format <servername,port>, or use a DNS
+
   -d <database>     Database to open
 
-And then either...
   -E                Use Integrated Security
            -OR-
   -U <user>         SQL Login user
   -P <password>     SQL Login password
+           -OR-
+  (Nothing at all, for example, SQLite, or DNS includes security)
 
-Optional arguments:
   --driver <driver> ODBC driver name, defaults to {SQL Server}. Use the value
                     "DSN" to use a Data Source Name in the <server>
-                    parameter instead of an actual server
+                    parameter instead of an actual servername
 """
 from docopt import docopt
 import traceback
@@ -35,7 +37,7 @@ from datetime import datetime, date
 import decimal  # added for PyInstaller
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
-ConnParams = namedtuple("ConnParams", "server database user password driver")
+ConnParams = namedtuple("ConnParams", "server database user password driver intsec")
 
 max_column_width = 100
 max_rows_print = 50
@@ -81,7 +83,7 @@ def command_help(modifiers, params):
          f'database_name".\n'
          f':use database_name{sep}changes the connection to "database_name".\n'
          f':timeout [seconds]{sep}sets the command timeout. '
-         f'Default: 30 seconds.'
+         f'Default: 30 seconds.\n'
          f':addcommand [name] [query text]{sep}creates a custom command for the current '
          f'session only, same single line format as commands.scl. Use :name to call it.')
     print(t)
@@ -324,7 +326,7 @@ def command_use(modifiers, params):
     if params and len(params) == 1:
         old_conn = conninfo
         conninfo = ConnParams(conninfo.server, params[0], conninfo.user,
-                              conninfo.password, conninfo.driver)
+                              conninfo.password, conninfo.driver, conninfo.intsec)
         try:
             create_connection()
         except:
@@ -588,9 +590,11 @@ def create_connection():
     if conninfo.driver == "DSN":
         connection = (f"DSN={conninfo.server};"
                       f"Database={conninfo.database};")
-    if not conninfo.user:
+    # When no -E or user/pass is provided, then that section is skipped.
+    # This is the case for SQLite
+    if conninfo.intsec:
         connection += "Trusted_Connection=Yes;"
-    else:
+    if conninfo.user:
         connection += f"Uid={conninfo.user};Pwd={conninfo.password};"
     conn = pyodbc.connect(connection, autocommit=True)
     conn.add_output_converter(-155, handle_datetimeoffset)
@@ -659,11 +663,11 @@ if __name__ == "__main__":
     database = arguments["-d"]
     user = arguments["-U"]
     password = arguments["-P"]
-    port = None
+    intsec = arguments["-E"]
     driver = arguments["--driver"]
     if not driver:
         driver = "{SQL Server}"
-    conninfo = ConnParams(server, database, user, password, driver)
+    conninfo = ConnParams(server, database, user, password, driver, intsec)
     load_custom_commands()
     create_connection()
     query_loop()
