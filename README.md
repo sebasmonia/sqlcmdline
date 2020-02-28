@@ -56,6 +56,22 @@ to use `sqlcmdline` with no changes to the parameter list.
 Under Linux, to connect to MSSQL you can use a DSN, see https://github.com/mkleehammer/pyodbc/wiki/Connecting-to-SQL-Server-from-RHEL-6-or-Centos-7 for
 more details. If you go that route, specify `--driver DSN` and use the DSN name in the `<server>`.
 
+If everything works, you will get a `>` prompt to type your queries in. Once you are done with your command(s) type `GO` to send it to the server, yet
+another vestige of the MSSQL origins. You can also use `;;` as a shorthand at the end of a line instead;
+
+```
+ServerName@DatabaseName
+> SELECT * FROM SomeTable
+> GO
+
+-- results here--
+
+> SELECT * FROM SomeTable;;
+
+-- results here--
+
+```
+
 ## Commands
 
 Anything that starts with `:` is interpreted as a command. The `:help` command will print the following text:
