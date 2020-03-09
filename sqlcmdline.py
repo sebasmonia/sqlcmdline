@@ -37,7 +37,8 @@ from datetime import datetime, date
 import decimal  # added for PyInstaller
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
-ConnParams = namedtuple("ConnParams", "server database user password driver intsec")
+ConnParams = namedtuple("ConnParams",
+                        "server database user password driver intsec")
 
 max_column_width = 100
 max_rows_print = 50
@@ -76,9 +77,9 @@ def command_help(modifiers, params):
          f':src obj.name{sep}Will call "sp_helptext obj.name". Results won\'t'
          f' be truncated.\n'
          f':deps [to|from] obj.name{sep}Show dependencies to/from obj.name.\n'
-         f':file [-enc] path{sep}Opens a file and runs the script. No checking/'
-         f'parsing of the file will take place. Use -enc to change the encoding\n '
-         f'used to read the file. Examples: -utf8, -cp1250, -latin_1\n'
+         f':file [-enc] path{sep}Opens a file and runs the script. No checking'
+         f'/parsing of the file will take place. Use -enc to change the '
+         f'encoding\nused to read the file. Examples: -utf8, -cp1250\n'
          f':dbs database_name{sep}List all databases, or databases "like '
          f'database_name".\n'
          f':use database_name{sep}changes the connection to "database_name".\n'
@@ -281,7 +282,8 @@ def command_file(modifiers, params):
                     command_count = command_count + 1
                 else:
                     command.append(line)
-        print(f"\nCompleted processing file with {command_count} commands in {line_count} lines")
+        print(f"\nCompleted processing file with {command_count} commands"
+              f"in {line_count} lines")
         return PreparedCommand(None, None, None)
     except Exception as e:
         return PreparedCommand(None, str(e), None)
@@ -290,8 +292,8 @@ def command_file(modifiers, params):
 def command_databases(modifiers, params):
     # this is very crude way to selecting the right statement for each engine
     # it could (should...) be configurable, extensible, etc.
-    # but all other commands take advantage of INFORMATION_SCHEMA, taking the lazy
-    # way out of this one only.
+    # but all other commands take advantage of INFORMATION_SCHEMA, taking the
+    # lazy way out of this one only.
     # PS: there's also the option of a custom command
     global conninfo
 
@@ -309,9 +311,9 @@ def command_databases(modifiers, params):
             q += f"LIKE '%{params[0]}%'"
     elif "PostgreSQL" in conninfo.driver:
         q = f"SELECT datname FROM pg_database "
-        if params: # test
+        if params:  # test
             q += f"WHERE datname LIKE '%{params[0]}%'"
-    
+
     return PreparedCommand(q, None, None)
 
 
@@ -321,10 +323,11 @@ def command_use(modifiers, params):
     if params and len(params) == 1:
         old_conn = conninfo
         conninfo = ConnParams(conninfo.server, params[0], conninfo.user,
-                              conninfo.password, conninfo.driver, conninfo.intsec)
+                              conninfo.password, conninfo.driver,
+                              conninfo.intsec)
         try:
             create_connection()
-        except:
+        except Exception as e:
             conninfo = old_conn
             message = f"Connection to database {params[0]} failed."
     else:
@@ -346,6 +349,7 @@ def command_timeout(modifiers, params):
         return PreparedCommand(None, None, None)
     except Exception as e:
         return PreparedCommand(None, "Invalid arguments", None)
+
 
 commands = {":help": command_help,
             ":tables": command_tables,
@@ -400,7 +404,7 @@ def print_resultset(cursor):
 
     rowcount = cursor.rowcount
     if not odbc_rows:
-        return # no rows returned!
+        return  # no rows returned!
     column_names = [text_formatter(column[0]) for column in cursor.description]
     format_str, print_ready = format_rows(column_names, odbc_rows)
     print()  # blank line
@@ -493,7 +497,7 @@ def decimal_len(decimal_number):
 def process_command(line_typed):
     try:
         command_name, *rest = line_typed.split(" ")
-    except:
+    except Exception as e:
         command_name = "Nope"
     modifiers = [x for x in rest if x.startswith("-")]
     params = [x for x in rest if x not in modifiers]
