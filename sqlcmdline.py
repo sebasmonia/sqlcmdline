@@ -35,6 +35,7 @@ import operator as op
 from collections import defaultdict, namedtuple
 from datetime import datetime, date
 import decimal  # added for PyInstaller
+import configparser
 
 PreparedCommand = namedtuple("PrepCmd", "query error callback")
 ConnParams = namedtuple("ConnParams",
@@ -86,7 +87,7 @@ def command_help(modifiers, params):
          f':timeout [seconds]{sep}sets the command timeout. '
          f'Default: 30 seconds.')
     print(t)
-    t = ('\nCustom commands loaded from commands.scl:\n' +
+    t = ('\nCustom commands loaded from commands.ini:\n' +
          ', '.join(custom_commands.keys()))
     print(t)
     return (None, None, None)
@@ -511,11 +512,18 @@ def process_command(line_typed):
         t = "Invalid command name. Use :help for a list of available commands."
         return None, t, None
     if template:  # a custom command
-        query = template.format(*params)
-        error = None
-        cb = None
+        try:
+            query = template.format(*params)
+            error = None
+            cb = None
+        except IndexError:
+            # If someone ever uses {{ as a literal { in a query
+            # they will hate me
+            count = template.count("{")
+            t = f"The custom command expects {count} format parameter(s)."
+            return None, t, None
     if not error and query:
-        print(f"Query: {query}")
+        print(f"Query:\n{query}\n")
     return query, error, cb
 
 
@@ -532,13 +540,14 @@ def determine_directory():
 
 def load_custom_commands():
     _dir = determine_directory()
-    comm_file = os.path.join(_dir, "commands.scl")
+    comm_file = os.path.join(_dir, "commands.ini")
     if not os.path.isfile(comm_file):
         return  # no error or anything
-    with open(comm_file) as f:
-        for line in f:
-            c, q = line.split(' ', 1)
-            custom_commands[c] = q
+    commands = configparser.ConfigParser()
+    commands.read(comm_file)
+    valid = [x for x in commands.sections() if x.startswith(":")]
+    for cmd in valid:
+        custom_commands[cmd] = commands[cmd]["query"]
 
 
 # source:
@@ -590,6 +599,17 @@ def prompt_query_command():
             return lines[-1]  # for commands ignore previous lines
 
 
+def prompt_parameters(query):
+    # Extremely flaky way to determine the number of parameters
+    # to bind when calling execute(), if a user ever runs into
+    # this problem, we'll see...I wouldn't expect someone
+    # using sqlcmdline for queries _that_ complex
+    params = []
+    for param_num in range(1, query.count("?") + 1):
+        params.append(input(f"parameter {param_num}>"))
+    return params
+
+
 def query_loop():
     global connection
     global conninfo
@@ -616,7 +636,8 @@ def query_loop():
             if query:
                 # print("\n----------\n", query, "\n----------\n")
                 cursor = connection.cursor()
-                cursor.execute(query)
+                params = prompt_parameters(query)
+                cursor.execute(query, params)
                 rcount = cursor.rowcount
                 # There used to be a check here, based on rcount, but this
                 # version that tries prints + always shows rows affected

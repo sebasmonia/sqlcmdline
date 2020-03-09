@@ -72,6 +72,21 @@ ServerName@DatabaseName
 
 ```
 
+Using a `?` in a query will prompt for parameters. This is not as useful inline, although escaping is handy, but great for custom command (more on this
+later):
+
+```
+ServerName@DatabaseName
+> SELECT * FROM SomeTable WHERE username = ? AND tool = ?;;
+
+parameter 1>sebasmonia
+parameter 2>git
+
+
+-- results here--
+```
+
+
 ## Commands
 
 Anything that starts with `:` is interpreted as a command. The `:help` command will print the following text:
@@ -110,15 +125,12 @@ Notes:
 
 ## Custom commands
 
-The file `commands.scl` can be used to define custome commands, which you also invoke via the prefix `:`.
-These commands are defined one per line, as `:command-name`[space]`you query`. You can use Python's `format` syntax to replace 
-placeholders in the query text by something else.
+The file `commands.ini` can be used to define custome commands, which you also invoke via the prefix `:`.
+These commands are defined in the file `commands.ini`, samples are included in the repo. You can use Python's `format` syntax to replace 
+placeholders in the query text by something else, which is really flexible as is allows changing the table name or list of fields on each
+invocation.
+After the `format` replacements are done, the query is processed "as usual" so you get prompted for `?` placeholders.
 
-Example 1: if you have this in the file `:top SELECT TOP {0} * FROM {1}` it would be invoked as `:top 5 my_table` and run the query
-`SELECT TOP 5 FROM my_table`
-
-Example 2: `:logs-username SELECT * FROM MyLogTable WHERE Username = '{0}'` can be invoked as `:logs-username admin` and it will run
-the query `SELECT * FROM MyLogTable WHERE Username = 'admin'`.
 
 ## Emacs usage tips
 
