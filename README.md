@@ -72,7 +72,7 @@ ServerName@DatabaseName
 
 ```
 
-Using a `?` in a query will prompt for parameters. This is not as useful inline, although escaping is handy, but great for custom command (more on this
+Using a `?` in a query will prompt for parameters. This is not as useful inline, although escaping is handy, but great for custom commands (more on this
 later):
 
 ```
@@ -126,11 +126,12 @@ Notes:
 ## Custom commands
 
 The file `commands.ini` can be used to define custome commands, which you also invoke via the prefix `:`.
-These commands are defined in the file `commands.ini`, samples are included in the repo. You can use Python's `format` syntax to replace 
-placeholders in the query text by something else, which is really flexible as is allows changing the table name or list of fields on each
-invocation.
-After the `format` replacements are done, the query is processed "as usual" so you get prompted for `?` placeholders.
+These commands are defined in the file `commands.ini`, samples are included in the repo.
 
+You can use Python's `format` syntax to replace placeholders in the query text by something else, which is really flexible
+as is allows changing the table name or list of fields on each invocation.
+
+After the `format` replacements are done, the query is processed "as usual" so you get prompted for `?` placeholders.
 
 ## Emacs usage tips
 
