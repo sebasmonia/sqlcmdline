@@ -126,12 +126,13 @@ Notes:
 ## Custom commands
 
 The file `commands.ini` can be used to define custome commands, which you also invoke via the prefix `:`.
-These commands are defined in the file `commands.ini`, samples are included in the repo.
 
 You can use Python's `format` syntax to replace placeholders in the query text by something else, which is really flexible
-as is allows changing the table name or list of fields on each invocation.
+as it allows changing the table name or list of fields on each invocation.
 
-After the `format` replacements are done, the query is processed "as usual" so you get prompted for `?` placeholders.
+After the `format` replacements are done, the query is processed "as usual" so you get prompted for `?` placeholders, if any.  
+
+There are samples for different types of commands (with format parameters only, both combined, etc.) in the repository.
 
 ## Emacs usage tips
 
