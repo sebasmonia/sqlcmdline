@@ -606,7 +606,7 @@ def prompt_parameters(query):
     # using sqlcmdline for queries _that_ complex
     params = []
     for param_num in range(1, query.count("?") + 1):
-        params.append(input(f"parameter {param_num}>"))
+        params.append(input(f"{param_num}>"))
     return params
 
 
