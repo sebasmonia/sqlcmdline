@@ -570,7 +570,7 @@ def create_connection():
         connection = f"DSN={conninfo.server};"
     else:
         connection = f"Driver={conninfo.driver};"
-    if conninfo.server:
+    if conninfo.server and not conninfo.driver == "DSN":
         connection += f"Server={conninfo.server};"
     if conninfo.database:
         connection += f"Database={conninfo.database};"
