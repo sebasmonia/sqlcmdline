@@ -6,6 +6,10 @@ The source file can be compiled with PyInstaller. Uses f-strings, so it requires
 
 Latest version has improved compatibility with MySQL and hopefully other DB engines. Please open an issue if you run into any problems!
 
+**Version 2 available!** If you don't need a 1:1 replacement for sqlcmd, you can [try Datum instead](https://github.com/sebasmonia/datum/), version 2 of this tool.  
+It supports independent configuration files and was built from scratch to use multiple DBs. It also includes an Emacs package to add Datum as a "sql-product".  
+
+
 ## Table of contents
 
 <!--ts-->
